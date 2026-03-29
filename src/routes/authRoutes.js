@@ -5,24 +5,21 @@ const jwt = require("jsonwebtoken");
 const Student = require("../models/Student");
 const Faculty = require("../models/Faculty");
 
-console.log("AUTH ROUTES FILE LOADED");
+console.log("AUTH ROUTES FILE LOADED - V2");
 
-// REGISTER
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+
+    console.log("REGISTER ATTEMPT:", { name, email, role }); // debug
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     if (role === "faculty") {
-      // Faculty register
       const existing = await Faculty.findOne({ email });
       if (existing) return res.status(400).json({ error: "Faculty already exists" });
 
-      const faculty = new Faculty({
-        name,
-        email,
-        passwordHash: hashedPassword
-      });
+      const faculty = new Faculty({ name, email, passwordHash: hashedPassword });
       await faculty.save();
 
       const token = jwt.sign(
@@ -34,19 +31,11 @@ router.post("/register", async (req, res) => {
       return res.status(201).json({ message: "Faculty registered successfully", token });
 
     } else {
-      // Student register
       const { rollNo, semester, section } = req.body;
       const existing = await Student.findOne({ email });
       if (existing) return res.status(400).json({ error: "Student already exists" });
 
-      const student = new Student({
-        name,
-        rollNo,
-        email,
-        semester,
-        section,
-        passwordHash: hashedPassword
-      });
+      const student = new Student({ name, rollNo, email, semester, section, passwordHash: hashedPassword });
       await student.save();
 
       const token = jwt.sign(
@@ -59,21 +48,18 @@ router.post("/register", async (req, res) => {
     }
 
   } catch (error) {
-    console.error("ERROR:", error.message);
+    console.error("REGISTER ERROR:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// LOGIN
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Pehle Faculty mein dhundo
     let user = await Faculty.findOne({ email });
     let role = "faculty";
 
-    // Nahi mila toh Student mein dhundo
     if (!user) {
       user = await Student.findOne({ email });
       role = "student";
@@ -93,7 +79,7 @@ router.post("/login", async (req, res) => {
     res.json({ message: "Login successful", token, role });
 
   } catch (err) {
-    console.error(err);
+    console.error("LOGIN ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
