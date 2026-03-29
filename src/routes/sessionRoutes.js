@@ -3,10 +3,37 @@ const router = express.Router();
 const crypto = require('crypto');
 
 const Session = require('../models/Session');
+const AttendanceRecord = require('../models/AttendanceRecord');
 const { generateQRToken } = require('../services/qrService');
+const { calculateAQS } = require('../services/aqsService');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// Start a session
+// GET /api/sessions — all sessions
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const sessions = await Session.find()
+      .populate('facultyId', 'name email')
+      .sort({ createdAt: -1 });
+    res.json({ sessions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/sessions/:id — one session detail
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.id)
+      .populate('facultyId', 'name email')
+      .populate('pulseCheckId');
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    res.json({ session });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sessions/start
 router.post('/start', authMiddleware, async (req, res) => {
   try {
     const { subjectId, section } = req.body;
@@ -14,10 +41,7 @@ router.post('/start', authMiddleware, async (req, res) => {
     const qrSecret = crypto.randomBytes(32).toString('hex');
 
     const session = await Session.create({
-      facultyId,
-      subjectId,
-      section,
-      qrSecret,
+      facultyId, subjectId, section, qrSecret,
     });
 
     const qrToken = generateQRToken(session._id.toString(), qrSecret);
@@ -33,7 +57,7 @@ router.post('/start', authMiddleware, async (req, res) => {
   }
 });
 
-// Get current QR token (rotates every 30 sec)
+// GET /api/sessions/:id/qr
 router.get('/:id/qr', authMiddleware, async (req, res) => {
   try {
     const session = await Session.findById(req.params.id);
@@ -46,8 +70,6 @@ router.get('/:id/qr', authMiddleware, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-const AttendanceRecord = require('../models/AttendanceRecord');
-const { calculateAQS } = require('../services/aqsService');
 
 // POST /api/sessions/:id/close
 router.post('/:id/close', authMiddleware, async (req, res) => {
@@ -57,13 +79,10 @@ router.post('/:id/close', authMiddleware, async (req, res) => {
       { status: 'closed', endTime: new Date() },
       { new: true }
     );
-
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
-    // Get all students who attended
     const attendees = await AttendanceRecord.find({ sessionId: session._id });
 
-    // Calculate AQS for every student
     const aqsResults = await Promise.all(
       attendees.map((a) => calculateAQS(session._id.toString(), a.studentId.toString()))
     );

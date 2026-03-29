@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -15,9 +16,7 @@ const authMiddleware = require('./src/middleware/authMiddleware');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: '*' }
-});
+const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
@@ -33,7 +32,9 @@ app.use('/api/pulse-check', pulseCheckRoutes);
 app.use('/api/aqs', aqsRoutes);
 app.use('/api/ai', aiRoutes);
 
-// Socket.IO real-time events
+app.get('/', (req, res) => res.send('SmartAttend API Running'));
+
+// Socket.IO
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -43,22 +44,27 @@ io.on('connection', (socket) => {
   });
 
   socket.on('attendance-marked', (data) => {
-    io.to(data.sessionId).emit('attendance-update', data);
+    io.to(data.sessionId).emit('attendance-update', {
+      sessionId: data.sessionId,
+      studentId: data.studentId,
+      studentName: data.studentName,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   socket.on('pulse-check-triggered', (data) => {
-    io.to(data.sessionId).emit('new-quiz', data);
+    io.to(data.sessionId).emit('new-quiz', {
+      sessionId: data.sessionId,
+      pulseCheckId: data.pulseCheckId,
+      questions: data.questions,
+      durationSec: data.durationSec,
+      expiresAt: data.expiresAt,
+    });
   });
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
-});
-
-app.get('/', (req, res) => res.send('SmartAttend API Running'));
-
-app.get('/api/protected', authMiddleware, (req, res) => {
-  res.json({ message: 'Protected route works', user: req.user });
 });
 
 const PORT = process.env.PORT || 5000;
