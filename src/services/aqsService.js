@@ -13,17 +13,19 @@ async function calculateAQS(sessionId, studentId) {
   }
 
   const pulseCheck = await PulseCheck.findOne({ sessionId });
-  if (!pulseCheck) return { presence: 40, attempt: 0, correctness: 0, total: 40 };
-
-  const response = await QuizResponse.findOne({
-    pulseCheckId: pulseCheck._id,
-    studentId,
-  });
-
-  const attemptScore = response ? 30 : 0;
   let correctnessScore = 0;
-  if (response) {
-    correctnessScore = Math.round((response.score / response.maxScore) * 30);
+  let attemptScore = 0;
+
+  if (pulseCheck) {
+    const response = await QuizResponse.findOne({
+      pulseCheckId: pulseCheck._id,
+      studentId,
+    });
+
+    attemptScore = response ? 30 : 0;
+    if (response) {
+      correctnessScore = Math.round((response.score / response.maxScore) * 30);
+    }
   }
 
   const total = presenceScore + attemptScore + correctnessScore;
