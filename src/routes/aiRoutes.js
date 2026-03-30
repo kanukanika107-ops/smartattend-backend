@@ -145,6 +145,32 @@ async function getStudentFallbackMatches(studentId) {
   }));
 }
 
+function buildFacultyFallbackAnswer(matches) {
+  if (!matches.length) {
+    return 'No attendance analytics records were found for the requested query.';
+  }
+
+  const lowPerformers = matches.filter((match) => Number(match.totalAQS) < 50);
+  if (!lowPerformers.length) {
+    return `No low-performing students were found in the retrieved records. Total records checked: ${matches.length}.`;
+  }
+
+  const names = lowPerformers
+    .map((match) => match.student?.name || 'Unknown Student')
+    .join(', ');
+
+  return `Low-performing students found: ${names}. Retrieved ${matches.length} relevant record(s), and ${lowPerformers.length} have total AQS below 50.`;
+}
+
+function buildStudentFallbackAnswer(matches) {
+  if (!matches.length) {
+    return 'No student analytics records were found for this query.';
+  }
+
+  const latest = matches[0];
+  return `Your latest retrieved attendance record shows a total AQS of ${latest.totalAQS || 0}. Keep attending sessions regularly to improve your score.`;
+}
+
 router.post('/sync-embeddings', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'faculty') {
@@ -228,8 +254,15 @@ Answer only from the retrieved context.
 Keep the answer concise, clear, and useful.
     `;
 
-    const result = await model.generateContent(prompt);
-    const aiResponse = result.response.text();
+    let aiResponse;
+
+    try {
+      const result = await model.generateContent(prompt);
+      aiResponse = result.response.text();
+    } catch (generationError) {
+      console.error('FACULTY GENERATION FALLBACK:', generationError.message);
+      aiResponse = buildFacultyFallbackAnswer(matches);
+    }
 
     res.json({
       query,
@@ -294,8 +327,15 @@ Answer in a helpful, encouraging, concise way.
 Only use the retrieved context.
     `;
 
-    const result = await model.generateContent(prompt);
-    const aiResponse = result.response.text();
+    let aiResponse;
+
+    try {
+      const result = await model.generateContent(prompt);
+      aiResponse = result.response.text();
+    } catch (generationError) {
+      console.error('STUDENT GENERATION FALLBACK:', generationError.message);
+      aiResponse = buildStudentFallbackAnswer(matches);
+    }
 
     res.json({
       query,
