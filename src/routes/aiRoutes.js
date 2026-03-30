@@ -107,6 +107,44 @@ async function runStudentVectorSearch(queryEmbedding, studentId) {
   ]);
 }
 
+async function getFacultyFallbackMatches() {
+  const records = await AQSRecord.find()
+    .populate('studentId', 'name rollNo')
+    .populate('sessionId', 'subjectId startTime')
+    .sort({ computedAt: -1, createdAt: -1 })
+    .limit(5)
+    .lean();
+
+  return records.map((record) => ({
+    totalAQS: record.totalAQS,
+    presenceScore: record.presenceScore,
+    attemptScore: record.attemptScore,
+    correctnessScore: record.correctnessScore,
+    searchableText: record.searchableText,
+    score: null,
+    student: record.studentId,
+    session: record.sessionId,
+  }));
+}
+
+async function getStudentFallbackMatches(studentId) {
+  const records = await AQSRecord.find({ studentId })
+    .populate('sessionId', 'subjectId startTime')
+    .sort({ computedAt: -1, createdAt: -1 })
+    .limit(5)
+    .lean();
+
+  return records.map((record) => ({
+    totalAQS: record.totalAQS,
+    presenceScore: record.presenceScore,
+    attemptScore: record.attemptScore,
+    correctnessScore: record.correctnessScore,
+    searchableText: record.searchableText,
+    score: null,
+    session: record.sessionId,
+  }));
+}
+
 router.post('/sync-embeddings', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'faculty') {
@@ -164,7 +202,16 @@ router.post('/faculty-query', authMiddleware, async (req, res) => {
     }
 
     const queryEmbedding = await getEmbedding(query);
-    const matches = await runFacultyVectorSearch(queryEmbedding);
+    let matches = [];
+    let retrievalMode = 'vector';
+
+    try {
+      matches = await runFacultyVectorSearch(queryEmbedding);
+    } catch (vectorError) {
+      console.error('FACULTY VECTOR SEARCH FALLBACK:', vectorError.message);
+      matches = await getFacultyFallbackMatches();
+      retrievalMode = 'fallback';
+    }
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
@@ -187,6 +234,7 @@ Keep the answer concise, clear, and useful.
     res.json({
       query,
       aiResponse,
+      retrievalMode,
       retrievedCount: matches.length,
       matches,
     });
@@ -220,7 +268,16 @@ router.post('/student-query', authMiddleware, async (req, res) => {
     }
 
     const queryEmbedding = await getEmbedding(query);
-    const matches = await runStudentVectorSearch(queryEmbedding, studentId);
+    let matches = [];
+    let retrievalMode = 'vector';
+
+    try {
+      matches = await runStudentVectorSearch(queryEmbedding, studentId);
+    } catch (vectorError) {
+      console.error('STUDENT VECTOR SEARCH FALLBACK:', vectorError.message);
+      matches = await getStudentFallbackMatches(studentId);
+      retrievalMode = 'fallback';
+    }
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
@@ -243,6 +300,7 @@ Only use the retrieved context.
     res.json({
       query,
       aiResponse,
+      retrievalMode,
       retrievedCount: matches.length,
       matches,
     });
