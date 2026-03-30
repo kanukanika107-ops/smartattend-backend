@@ -137,6 +137,7 @@ router.post('/sync-embeddings', authMiddleware, async (req, res) => {
       updated,
     });
   } catch (err) {
+    console.error('SYNC EMBEDDINGS ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -147,6 +148,19 @@ router.post('/faculty-query', authMiddleware, async (req, res) => {
 
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const embeddedCount = await AQSRecord.countDocuments({
+      embedding: { $exists: true, $ne: [] },
+    });
+
+    if (embeddedCount === 0) {
+      return res.json({
+        query,
+        aiResponse: 'No attendance analytics data is available yet. Please generate AQS records and sync embeddings first.',
+        retrievedCount: 0,
+        matches: [],
+      });
     }
 
     const queryEmbedding = await getEmbedding(query);
@@ -177,6 +191,7 @@ Keep the answer concise, clear, and useful.
       matches,
     });
   } catch (err) {
+    console.error('FACULTY QUERY ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -188,6 +203,20 @@ router.post('/student-query', authMiddleware, async (req, res) => {
 
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const embeddedCount = await AQSRecord.countDocuments({
+      studentId,
+      embedding: { $exists: true, $ne: [] },
+    });
+
+    if (embeddedCount === 0) {
+      return res.json({
+        query,
+        aiResponse: 'No student analytics data is available yet. Please generate AQS records and sync embeddings first.',
+        retrievedCount: 0,
+        matches: [],
+      });
     }
 
     const queryEmbedding = await getEmbedding(query);
@@ -218,6 +247,7 @@ Only use the retrieved context.
       matches,
     });
   } catch (err) {
+    console.error('STUDENT QUERY ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -254,6 +284,7 @@ Return only JSON, no extra text.
       message: 'Questions generated successfully',
     });
   } catch (err) {
+    console.error('GENERATE QUESTIONS ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
