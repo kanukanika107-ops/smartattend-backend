@@ -6,6 +6,28 @@ const Session = require('../models/Session');
 const { verifyQRToken } = require('../services/qrService');
 const authMiddleware = require('../middleware/authMiddleware');
 
+async function resolveSessionFromRequest(sessionId, qrToken) {
+  if (sessionId) {
+    const directSession = await Session.findById(sessionId);
+    if (directSession) return directSession;
+  }
+
+  if (!qrToken) return null;
+
+  const activeSessions = await Session.find({ status: 'active' })
+    .sort({ createdAt: -1 })
+    .limit(25);
+
+  for (const session of activeSessions) {
+    const isValid = verifyQRToken(session._id.toString(), session.qrSecret, qrToken);
+    if (isValid) {
+      return session;
+    }
+  }
+
+  return null;
+}
+
 // POST /api/attendance/mark
 router.post('/mark', authMiddleware, async (req, res) => {
   try {
@@ -13,7 +35,7 @@ router.post('/mark', authMiddleware, async (req, res) => {
     const studentId = req.user.id;
 
     // 1. Find the session
-    const session = await Session.findById(sessionId);
+    const session = await resolveSessionFromRequest(sessionId, qrToken);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (session.status === 'closed') return res.status(400).json({ error: 'Session is closed' });
 
