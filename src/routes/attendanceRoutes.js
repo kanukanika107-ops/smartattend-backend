@@ -45,7 +45,7 @@ router.post('/mark', authMiddleware, async (req, res) => {
 
     // 3. Save attendance
     const record = await AttendanceRecord.create({
-      sessionId,
+      sessionId: session._id,
       studentId,
       gpsLat,
       gpsLng,
