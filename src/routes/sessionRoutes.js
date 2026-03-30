@@ -6,6 +6,7 @@ const Session = require('../models/Session');
 const AttendanceRecord = require('../models/AttendanceRecord');
 const { generateQRToken } = require('../services/qrService');
 const { calculateAQS } = require('../services/aqsService');
+const { createSessionProof } = require('../services/blockchainService');
 const authMiddleware = require('../middleware/authMiddleware');
 
 // GET /api/sessions — all sessions
@@ -87,10 +88,19 @@ router.post('/:id/close', authMiddleware, async (req, res) => {
       attendees.map((a) => calculateAQS(session._id.toString(), a.studentId.toString()))
     );
 
+    const { proof } = await createSessionProof(session);
+    await Session.findByIdAndUpdate(session._id, { blockchainTxHash: proof.txHash });
+
     res.json({
       message: 'Session closed',
       totalAttendees: attendees.length,
       aqsResults,
+      blockchainProof: {
+        dataHash: proof.dataHash,
+        txHash: proof.txHash,
+        blockNumber: proof.blockNumber,
+        verifiedAt: proof.verifiedAt,
+      },
     });
   } catch (err) {
     console.error('CLOSE ERROR:', err.message);

@@ -19,10 +19,6 @@ router.post('/mark', authMiddleware, async (req, res) => {
 
     // 2. Verify QR token
     const isValidQR = verifyQRToken(session._id.toString(), session.qrSecret, qrToken);
-    console.log('SESSION ID:', session._id.toString());
-console.log('QR SECRET:', session.qrSecret?.slice(0,10));
-console.log('TOKEN RECEIVED:', qrToken?.slice(0,10));
-console.log('IS VALID:', isValidQR);
     if (!isValidQR) return res.status(400).json({ error: 'Invalid or expired QR code' });
 
     // 3. Save attendance

@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 
-console.log('AUTH ROUTES FILE LOADED');
+const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
 // REGISTER
 router.post('/register', async (req, res) => {
@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user._id, email: user.email, role },
-      'secretkey',
+      JWT_SECRET,
       { expiresIn: '1h' }
     );
 

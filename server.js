@@ -12,7 +12,7 @@ const attendanceRoutes = require('./src/routes/attendanceRoutes');
 const pulseCheckRoutes = require('./src/routes/pulseCheckRoutes');
 const aqsRoutes = require('./src/routes/aqsRoutes');
 const aiRoutes = require('./src/routes/aiRoutes');
-const authMiddleware = require('./src/middleware/authMiddleware');
+const verifyRoutes = require('./src/routes/verifyRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +31,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/pulse-check', pulseCheckRoutes);
 app.use('/api/aqs', aqsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/verify', verifyRoutes);
 
 app.get('/', (req, res) => res.send('SmartAttend API Running'));
 
