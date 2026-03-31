@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 
 const Class = require('../models/Class');
 const AcademicSession = require('../models/AcademicSession');
@@ -11,6 +14,32 @@ const authMiddleware = require('../middleware/authMiddleware');
 function generateTempPassword() {
   return crypto.randomBytes(4).toString('hex');
 }
+
+const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'students');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeName = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+    cb(null, safeName);
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.jpg' || ext === '.jpeg') {
+      return cb(null, true);
+    }
+    return cb(new Error('Only .jpg/.jpeg files are allowed'));
+  },
+  limits: { fileSize: 2 * 1024 * 1024 },
+});
 
 router.post('/', authMiddleware, async (req, res) => {
   try {
@@ -78,7 +107,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/:id/students', authMiddleware, async (req, res) => {
+router.post('/:id/students', authMiddleware, upload.single('photo'), async (req, res) => {
   try {
     if (req.user.role !== 'faculty') {
       return res.status(403).json({ error: 'Only faculty can add students' });
@@ -87,13 +116,14 @@ router.post('/:id/students', authMiddleware, async (req, res) => {
     const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
     if (!classDoc) return res.status(404).json({ error: 'Class not found' });
 
-    const { name, rollNo, semester, section, photoUrl } = req.body;
+    const { name, rollNo, semester, section } = req.body;
     if (!name || !rollNo) {
       return res.status(400).json({ error: 'name and rollNo are required' });
     }
 
     const plainPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(plainPassword, 10);
+    const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
 
     const student = await Student.create({
       name,
@@ -101,7 +131,7 @@ router.post('/:id/students', authMiddleware, async (req, res) => {
       semester: semester || 1,
       section: section || classDoc.section,
       classId: classDoc._id,
-      photoUrl: photoUrl || null,
+      photoUrl,
       passwordHash,
     });
 
@@ -116,8 +146,11 @@ router.post('/:id/students', authMiddleware, async (req, res) => {
       generatedPassword: plainPassword,
     });
   } catch (err) {
+    if (err.message && err.message.includes('Only .jpg/.jpeg files')) {
+      return res.status(400).json({ error: err.message });
+    }
     if (err.code === 11000) {
-      return res.status(400).json({ error: 'Student with same rollNo or email already exists' });
+      return res.status(400).json({ error: 'Student with same rollNo already exists' });
     }
     res.status(500).json({ error: err.message });
   }

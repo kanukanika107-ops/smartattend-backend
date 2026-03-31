@@ -53,7 +53,7 @@ Faculty:
 
 Sample student used during testing:
 
-- Email: `student@test.com`
+- Roll No: `101`
 - Password: `123456`
 
 ## Auth Header
@@ -103,6 +103,21 @@ Authorization: Bearer <token>
 
 - `POST /api/academic-sessions`
 - `GET /api/academic-sessions`
+- `GET /api/academic-sessions/range`
+
+### Classes & Students
+
+- `POST /api/classes`
+- `GET /api/classes`
+- `GET /api/classes/:id`
+- `POST /api/classes/:id/students`
+- `GET /api/classes/:id/students`
+
+Photo upload:
+
+- `POST /api/classes/:id/students` supports `multipart/form-data`
+- field name: `photo` (JPEG only)
+- response includes `photoUrl`
 
 ### AI
 
