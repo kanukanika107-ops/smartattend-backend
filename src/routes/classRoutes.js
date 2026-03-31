@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
 const Class = require('../models/Class');
+const AcademicSession = require('../models/AcademicSession');
 const Student = require('../models/Student');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -17,13 +18,26 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Only faculty can create classes' });
     }
 
-    const { academicSession, subjectName, classCode, section } = req.body;
-    if (!academicSession || !subjectName || !classCode) {
-      return res.status(400).json({ error: 'academicSession, subjectName, and classCode are required' });
+    const { academicSession, academicSessionId, subjectName, classCode, section } = req.body;
+    if ((!academicSession && !academicSessionId) || !subjectName || !classCode) {
+      return res.status(400).json({ error: 'academicSession or academicSessionId, subjectName, and classCode are required' });
+    }
+
+    let sessionLabel = academicSession || null;
+    let sessionRef = null;
+
+    if (academicSessionId) {
+      const sessionDoc = await AcademicSession.findOne({ _id: academicSessionId, facultyId: req.user.id });
+      if (!sessionDoc) {
+        return res.status(404).json({ error: 'Academic session not found' });
+      }
+      sessionLabel = sessionDoc.label;
+      sessionRef = sessionDoc._id;
     }
 
     const created = await Class.create({
-      academicSession,
+      academicSession: sessionLabel,
+      academicSessionId: sessionRef,
       subjectName,
       classCode,
       section: section || 'A',

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const classSchema = new mongoose.Schema({
   academicSession: { type: String, required: true },
+  academicSessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicSession', default: null },
   subjectName: { type: String, required: true },
   classCode: { type: String, required: true },
   section: { type: String, default: 'A' },

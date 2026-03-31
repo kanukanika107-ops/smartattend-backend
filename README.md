@@ -99,6 +99,11 @@ Authorization: Bearer <token>
 - `POST /api/aqs/rebuild/:sessionId`
 - `POST /api/aqs/rebuild-all`
 
+### Academic Sessions
+
+- `POST /api/academic-sessions`
+- `GET /api/academic-sessions`
+
 ### AI
 
 - `POST /api/ai/sync-embeddings`
