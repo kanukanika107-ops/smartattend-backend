@@ -34,14 +34,18 @@ router.post('/register', async (req, res) => {
 // LOGIN
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, rollNo, password } = req.body;
 
     // Check faculty first
-    let user = await Faculty.findOne({ email });
+    let user = email ? await Faculty.findOne({ email }) : null;
     let role = 'faculty';
 
     if (!user) {
-      user = await Student.findOne({ email });
+      if (rollNo) {
+        user = await Student.findOne({ rollNo });
+      } else {
+        user = await Student.findOne({ email });
+      }
       role = 'student';
     }
 
