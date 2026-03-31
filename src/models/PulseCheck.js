@@ -6,6 +6,7 @@ const schema = new mongoose.Schema({
     text: String,
     type: { type: String, enum: ['mcq','tf','fill','short'] },
     options: [String], correctAnswer: String, difficulty: String,
+    approved: { type: Boolean, default: false },
   }],
   durationSec: { type: Number, default: 240 },
   triggeredAt: Date, expiresAt: Date,

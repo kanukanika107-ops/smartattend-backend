@@ -87,6 +87,8 @@ Authorization: Bearer <token>
 ### Pulse Check
 
 - `POST /api/pulse-check/create`
+- `PUT /api/pulse-check/:id/questions`
+- `POST /api/pulse-check/:id/approve`
 - `POST /api/pulse-check/:id/trigger`
 - `POST /api/pulse-check/:id/submit`
 
@@ -117,6 +119,13 @@ Implemented backend flow:
 3. Faculty and student AI routes try vector retrieval first.
 4. If vector search is unavailable, backend falls back to recent analytics records.
 5. If AI text generation fails, backend returns a safe fallback summary instead of crashing.
+
+## Pulse Check Approval Flow
+
+1. Teacher creates quiz questions (manual or AI-generated).
+2. Teacher reviews and edits questions.
+3. Teacher approves questions.
+4. Only approved questions can be triggered for students.
 
 ## Verification / Blockchain Proof
 
