@@ -87,7 +87,7 @@ router.post('/:id/students', authMiddleware, async (req, res) => {
     const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
     if (!classDoc) return res.status(404).json({ error: 'Class not found' });
 
-    const { name, rollNo, email, semester, section, photoUrl, parentPhone, parentEmail } = req.body;
+    const { name, rollNo, semester, section, photoUrl } = req.body;
     if (!name || !rollNo) {
       return res.status(400).json({ error: 'name and rollNo are required' });
     }
@@ -98,13 +98,10 @@ router.post('/:id/students', authMiddleware, async (req, res) => {
     const student = await Student.create({
       name,
       rollNo,
-      email: email || `${rollNo}@smartattend.local`,
       semester: semester || 1,
       section: section || classDoc.section,
       classId: classDoc._id,
       photoUrl: photoUrl || null,
-      parentPhone,
-      parentEmail,
       passwordHash,
     });
 
@@ -114,7 +111,6 @@ router.post('/:id/students', authMiddleware, async (req, res) => {
         id: student._id,
         name: student.name,
         rollNo: student.rollNo,
-        email: student.email,
         classId: student.classId,
       },
       generatedPassword: plainPassword,
@@ -137,7 +133,7 @@ router.get('/:id/students', authMiddleware, async (req, res) => {
     if (!classDoc) return res.status(404).json({ error: 'Class not found' });
 
     const students = await Student.find({ classId: classDoc._id })
-      .select('name rollNo email semester section photoUrl')
+      .select('name rollNo semester section photoUrl')
       .sort({ rollNo: 1 });
 
     res.json({ students });

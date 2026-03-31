@@ -21,7 +21,11 @@ router.post('/register', async (req, res) => {
     }
 
     const student = await Student.create({
-      name, rollNo, email, semester: semester || 1, section: section || 'A', passwordHash: hashedPassword
+      name,
+      rollNo,
+      semester: semester || 1,
+      section: section || 'A',
+      passwordHash: hashedPassword
     });
     res.status(201).json({ message: 'Student registered successfully', id: student._id });
 
