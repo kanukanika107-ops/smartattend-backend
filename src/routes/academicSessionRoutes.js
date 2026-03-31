@@ -49,4 +49,35 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/academic-sessions/range
+// Returns a list of session labels for dropdowns (default 1999-2070)
+router.get('/range', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'faculty') {
+      return res.status(403).json({ error: 'Only faculty can view academic sessions' });
+    }
+
+    const startYear = Number(req.query.startYear || 1999);
+    const endYear = Number(req.query.endYear || 2070);
+
+    if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || startYear > endYear) {
+      return res.status(400).json({ error: 'Invalid year range' });
+    }
+
+    const sessions = [];
+    for (let year = startYear; year <= endYear; year += 1) {
+      const label = `${year}-${String((year + 1) % 100).padStart(2, '0')}`;
+      sessions.push({
+        label,
+        startYear: year,
+        endYear: year + 1,
+      });
+    }
+
+    res.json({ sessions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
