@@ -152,18 +152,22 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
     if (!classDoc) return res.status(404).json({ error: 'Class not found' });
 
     const { name, rollNo, semester, section } = req.body;
-    if (!name || !rollNo) {
+    const normalizedRollNo = rollNo ? String(rollNo).trim() : '';
+    if (!name || !normalizedRollNo) {
       return res.status(400).json({ error: 'name and rollNo are required' });
     }
 
     const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
 
-    const existing = await Student.findOne({ rollNo });
+    const existing = await Student.findOne({ rollNo: normalizedRollNo });
     if (existing) {
       existing.name = name;
       existing.semester = semester || existing.semester || 1;
       existing.section = section || classDoc.section;
       existing.classId = classDoc._id;
+      if (existing.rollNo !== normalizedRollNo) {
+        existing.rollNo = normalizedRollNo;
+      }
       if (photoUrl) {
         existing.photoUrl = photoUrl;
       }
@@ -187,7 +191,7 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
 
     const student = await Student.create({
       name,
-      rollNo,
+      rollNo: normalizedRollNo,
       semester: semester || 1,
       section: section || classDoc.section,
       classId: classDoc._id,
@@ -248,7 +252,8 @@ router.post('/:id/students/bulk', authMiddleware, csvUpload.single('file'), asyn
 
     for (const row of records) {
       const name = row.name || row.Name;
-      const rollNo = row.rollNo || row.RollNo || row.rollno;
+      const rollNoRaw = row.rollNo || row.RollNo || row.rollno;
+      const rollNo = rollNoRaw ? String(rollNoRaw).trim() : '';
       const semester = row.semester || row.Semester || 1;
       const section = row.section || row.Section || classDoc.section;
       const photoUrl = row.photoUrl || row.PhotoUrl || null;
