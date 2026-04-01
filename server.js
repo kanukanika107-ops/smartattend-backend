@@ -15,6 +15,7 @@ const aiRoutes = require('./src/routes/aiRoutes');
 const verifyRoutes = require('./src/routes/verifyRoutes');
 const classRoutes = require('./src/routes/classRoutes');
 const academicSessionRoutes = require('./src/routes/academicSessionRoutes');
+const studentRoutes = require('./src/routes/studentRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +38,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/verify', verifyRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/academic-sessions', academicSessionRoutes);
+app.use('/api/students', studentRoutes);
 
 app.get('/', (req, res) => res.send('SmartAttend API Running'));
 

@@ -120,6 +120,28 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'faculty') {
+      return res.status(403).json({ error: 'Only faculty can delete classes' });
+    }
+
+    const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
+    if (!classDoc) return res.status(404).json({ error: 'Class not found' });
+
+    await Student.updateMany(
+      { classId: classDoc._id },
+      { $set: { classId: null } }
+    );
+
+    await classDoc.deleteOne();
+
+    res.json({ message: 'Class deleted successfully', classId: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/:id/students', authMiddleware, upload.single('photo'), async (req, res) => {
   try {
     if (req.user.role !== 'faculty') {
