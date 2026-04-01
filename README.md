@@ -111,6 +111,7 @@ Authorization: Bearer <token>
 - `GET /api/classes`
 - `GET /api/classes/:id`
 - `POST /api/classes/:id/students`
+- `POST /api/classes/:id/students/bulk`
 - `GET /api/classes/:id/students`
 
 Photo upload:
@@ -118,6 +119,12 @@ Photo upload:
 - `POST /api/classes/:id/students` supports `multipart/form-data`
 - field name: `photo` (JPEG only)
 - response includes `photoUrl`
+
+Bulk CSV upload:
+
+- `POST /api/classes/:id/students/bulk` supports `multipart/form-data`
+- field name: `file` (CSV)
+- columns: `name, rollNo, semester, section, photoUrl` (name + rollNo required)
 
 ### AI
 

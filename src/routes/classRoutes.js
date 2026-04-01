@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const { parse } = require('csv-parse/sync');
 
 const Class = require('../models/Class');
 const AcademicSession = require('../models/AcademicSession');
@@ -39,6 +40,18 @@ const upload = multer({
     return cb(new Error('Only .jpg/.jpeg files are allowed'));
   },
   limits: { fileSize: 2 * 1024 * 1024 },
+});
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.csv') {
+      return cb(null, true);
+    }
+    return cb(new Error('Only .csv files are allowed'));
+  },
 });
 
 router.post('/', authMiddleware, async (req, res) => {
@@ -151,6 +164,99 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
     }
     if (err.code === 11000) {
       return res.status(400).json({ error: 'Student with same rollNo already exists' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/classes/:id/students/bulk
+// multipart/form-data with file field "file" (CSV)
+router.post('/:id/students/bulk', authMiddleware, csvUpload.single('file'), async (req, res) => {
+  try {
+    if (req.user.role !== 'faculty') {
+      return res.status(403).json({ error: 'Only faculty can add students' });
+    }
+
+    const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
+    if (!classDoc) return res.status(404).json({ error: 'Class not found' });
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'CSV file is required (field: file)' });
+    }
+
+    const csvText = req.file.buffer.toString('utf8');
+    const records = parse(csvText, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ error: 'CSV has no rows' });
+    }
+
+    const toInsert = [];
+    const credentials = [];
+
+    for (const row of records) {
+      const name = row.name || row.Name;
+      const rollNo = row.rollNo || row.RollNo || row.rollno;
+      const semester = row.semester || row.Semester || 1;
+      const section = row.section || row.Section || classDoc.section;
+      const photoUrl = row.photoUrl || row.PhotoUrl || null;
+
+      if (!name || !rollNo) {
+        continue;
+      }
+
+      const plainPassword = generateTempPassword();
+      const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+      toInsert.push({
+        name,
+        rollNo,
+        semester,
+        section,
+        classId: classDoc._id,
+        photoUrl,
+        passwordHash,
+      });
+
+      credentials.push({ rollNo, password: plainPassword, name });
+    }
+
+    if (toInsert.length === 0) {
+      return res.status(400).json({ error: 'No valid rows found (name and rollNo required)' });
+    }
+
+    let createdCount = 0;
+    let errors = [];
+
+    try {
+      const result = await Student.insertMany(toInsert, { ordered: false });
+      createdCount = result.length;
+    } catch (err) {
+      if (Array.isArray(err.writeErrors)) {
+        errors = err.writeErrors.map((e) => ({
+          index: e.index,
+          message: e.errmsg || e.message,
+        }));
+        createdCount = (err.result && err.result.nInserted) || 0;
+      } else {
+        throw err;
+      }
+    }
+
+    res.status(201).json({
+      message: 'Bulk student import processed',
+      created: createdCount,
+      skipped: toInsert.length - createdCount,
+      errors,
+      credentials,
+    });
+  } catch (err) {
+    if (err.message && err.message.includes('Only .csv files')) {
+      return res.status(400).json({ error: err.message });
     }
     res.status(500).json({ error: err.message });
   }
