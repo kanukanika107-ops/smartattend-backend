@@ -214,6 +214,34 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
       return res.status(400).json({ error: err.message });
     }
     if (err.code === 11000) {
+      try {
+        const { rollNo, name, semester, section } = req.body;
+        const normalizedRollNo = rollNo ? String(rollNo).trim() : '';
+        if (normalizedRollNo) {
+          const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
+          const existing = await Student.findOne({ rollNo: normalizedRollNo });
+          if (existing && classDoc) {
+            existing.name = name || existing.name;
+            existing.semester = semester || existing.semester || 1;
+            existing.section = section || classDoc.section;
+            existing.classId = classDoc._id;
+            await existing.save();
+            return res.status(200).json({
+              message: 'Student assigned to class',
+              reused: true,
+              student: {
+                id: existing._id,
+                name: existing.name,
+                rollNo: existing.rollNo,
+                classId: existing.classId,
+              },
+              generatedPassword: null,
+            });
+          }
+        }
+      } catch (innerErr) {
+        return res.status(500).json({ error: innerErr.message });
+      }
       return res.status(400).json({ error: 'Student with same rollNo already exists' });
     }
     res.status(500).json({ error: err.message });
