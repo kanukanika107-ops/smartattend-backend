@@ -189,6 +189,7 @@ router.post('/:id/students/bulk', authMiddleware, csvUpload.single('file'), asyn
       columns: true,
       skip_empty_lines: true,
       trim: true,
+      bom: true,
     });
 
     if (!Array.isArray(records) || records.length === 0) {
