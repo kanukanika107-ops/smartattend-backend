@@ -3,6 +3,8 @@ const router = express.Router();
 
 const AttendanceRecord = require('../models/AttendanceRecord');
 const Session = require('../models/Session');
+const Student = require('../models/Student');
+const Class = require('../models/Class');
 const { verifyQRToken } = require('../services/qrService');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -38,6 +40,25 @@ router.post('/mark', authMiddleware, async (req, res) => {
     const session = await resolveSessionFromRequest(sessionId, qrToken);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (session.status === 'closed') return res.status(400).json({ error: 'Session is closed' });
+
+    // 2. Ensure student belongs to this class
+    const student = await Student.findById(studentId);
+    if (!student || !student.classId) {
+      return res.status(403).json({ error: 'Student not assigned to any class' });
+    }
+
+    const classDoc = await Class.findById(student.classId);
+    if (!classDoc) {
+      return res.status(403).json({ error: 'Student class not found' });
+    }
+
+    const classMatches =
+      classDoc.classCode === session.subjectId &&
+      classDoc.section === session.section;
+
+    if (!classMatches) {
+      return res.status(403).json({ error: 'Student not assigned to this class' });
+    }
 
     // 2. Verify QR token
     const isValidQR = verifyQRToken(session._id.toString(), session.qrSecret, qrToken);

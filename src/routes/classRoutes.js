@@ -156,9 +156,34 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
       return res.status(400).json({ error: 'name and rollNo are required' });
     }
 
+    const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
+
+    const existing = await Student.findOne({ rollNo });
+    if (existing) {
+      existing.name = name;
+      existing.semester = semester || existing.semester || 1;
+      existing.section = section || classDoc.section;
+      existing.classId = classDoc._id;
+      if (photoUrl) {
+        existing.photoUrl = photoUrl;
+      }
+      await existing.save();
+
+      return res.status(200).json({
+        message: 'Student assigned to class',
+        reused: true,
+        student: {
+          id: existing._id,
+          name: existing.name,
+          rollNo: existing.rollNo,
+          classId: existing.classId,
+        },
+        generatedPassword: null,
+      });
+    }
+
     const plainPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(plainPassword, 10);
-    const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
 
     const student = await Student.create({
       name,
