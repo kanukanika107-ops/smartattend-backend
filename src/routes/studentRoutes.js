@@ -47,4 +47,40 @@ router.get('/', async (req, res) => {
   }
 });
 
+// DELETE /api/students/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    if (req.user.role !== 'faculty') {
+      return res.status(403).json({ error: 'Only faculty can remove students' });
+    }
+
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    if (!student.classId) {
+      return res.status(400).json({ error: 'Student is not assigned to any class' });
+    }
+
+    const classDoc = await Class.findOne({
+      _id: student.classId,
+      facultyId: req.user.id,
+    });
+    if (!classDoc) {
+      return res.status(404).json({ error: 'Class not found' });
+    }
+
+    student.classId = null;
+    await student.save();
+
+    res.json({
+      message: 'Student removed from class',
+      studentId: student._id,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
