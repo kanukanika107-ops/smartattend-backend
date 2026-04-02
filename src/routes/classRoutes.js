@@ -184,7 +184,6 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
     const update = {
       $set: {
         name,
-        rollNo: normalizedRollNo,
         semester: semester || 1,
         section: section || classDoc.section,
         classId: classDoc._id,
