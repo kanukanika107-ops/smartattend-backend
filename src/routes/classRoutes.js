@@ -12,6 +12,24 @@ const AcademicSession = require('../models/AcademicSession');
 const Student = require('../models/Student');
 const authMiddleware = require('../middleware/authMiddleware');
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildRollQuery(rollNoValue) {
+  const normalized = rollNoValue ? String(rollNoValue).trim() : '';
+  const query = [];
+  if (normalized) {
+    query.push({ rollNo: normalized });
+    query.push({ rollNo: { $regex: new RegExp(`^\\s*${escapeRegex(normalized)}\\s*$`, 'i') } });
+    const rollAsNumber = Number(normalized);
+    if (!Number.isNaN(rollAsNumber)) {
+      query.push({ rollNo: rollAsNumber });
+    }
+  }
+  return query;
+}
+
 function generateTempPassword() {
   return crypto.randomBytes(4).toString('hex');
 }
@@ -159,17 +177,14 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
 
     const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
 
-    const rollQuery = [{ rollNo: normalizedRollNo }];
-    const rollAsNumber = Number(normalizedRollNo);
-    if (!Number.isNaN(rollAsNumber)) {
-      rollQuery.push({ rollNo: rollAsNumber });
-    }
+    const rollQuery = buildRollQuery(normalizedRollNo);
 
     const plainPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(plainPassword, 10);
     const update = {
       $set: {
         name,
+        rollNo: normalizedRollNo,
         semester: semester || 1,
         section: section || classDoc.section,
         classId: classDoc._id,
@@ -211,11 +226,7 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
         const normalizedRollNo = rollNo ? String(rollNo).trim() : '';
         if (normalizedRollNo) {
           const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
-          const rollQuery = [{ rollNo: normalizedRollNo }];
-          const rollAsNumber = Number(normalizedRollNo);
-          if (!Number.isNaN(rollAsNumber)) {
-            rollQuery.push({ rollNo: rollAsNumber });
-          }
+          const rollQuery = buildRollQuery(normalizedRollNo);
           const existing = await Student.findOne({ $or: rollQuery });
           if (existing && classDoc) {
             existing.name = name || existing.name;
