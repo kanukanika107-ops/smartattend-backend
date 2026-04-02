@@ -165,55 +165,41 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
       rollQuery.push({ rollNo: rollAsNumber });
     }
 
-    const existing = await Student.findOne({ $or: rollQuery });
-    if (existing) {
-      existing.name = name;
-      existing.semester = semester || existing.semester || 1;
-      existing.section = section || classDoc.section;
-      existing.classId = classDoc._id;
-      if (existing.rollNo !== normalizedRollNo) {
-        existing.rollNo = normalizedRollNo;
-      }
-      if (photoUrl) {
-        existing.photoUrl = photoUrl;
-      }
-      await existing.save();
-
-      return res.status(200).json({
-        message: 'Student assigned to class',
-        reused: true,
-        student: {
-          id: existing._id,
-          name: existing.name,
-          rollNo: existing.rollNo,
-          classId: existing.classId,
-        },
-        generatedPassword: null,
-      });
-    }
-
     const plainPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(plainPassword, 10);
+    const update = {
+      $set: {
+        name,
+        semester: semester || 1,
+        section: section || classDoc.section,
+        classId: classDoc._id,
+        ...(photoUrl ? { photoUrl } : {}),
+      },
+      $setOnInsert: {
+        rollNo: normalizedRollNo,
+        passwordHash,
+      },
+    };
 
-    const student = await Student.create({
-      name,
-      rollNo: normalizedRollNo,
-      semester: semester || 1,
-      section: section || classDoc.section,
-      classId: classDoc._id,
-      photoUrl,
-      passwordHash,
-    });
+    const result = await Student.findOneAndUpdate(
+      { $or: rollQuery },
+      update,
+      { new: true, upsert: true, setDefaultsOnInsert: true, rawResult: true }
+    );
 
-    res.status(201).json({
-      message: 'Student added',
+    const student = result.value || result;
+    const wasCreated = result.lastErrorObject && !result.lastErrorObject.updatedExisting;
+
+    res.status(wasCreated ? 201 : 200).json({
+      message: wasCreated ? 'Student added' : 'Student assigned to class',
+      reused: !wasCreated,
       student: {
         id: student._id,
         name: student.name,
         rollNo: student.rollNo,
         classId: student.classId,
       },
-      generatedPassword: plainPassword,
+      generatedPassword: wasCreated ? plainPassword : null,
     });
   } catch (err) {
     if (err.message && err.message.includes('Only .jpg/.jpeg files')) {
