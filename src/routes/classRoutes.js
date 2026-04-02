@@ -30,6 +30,14 @@ function buildRollQuery(rollNoValue) {
   return query;
 }
 
+async function findStudentByRollNo(rollNoValue) {
+  const rollQuery = buildRollQuery(rollNoValue);
+  if (!rollQuery.length) {
+    return null;
+  }
+  return Student.findOne({ $or: rollQuery });
+}
+
 function generateTempPassword() {
   return crypto.randomBytes(4).toString('hex');
 }
@@ -176,44 +184,54 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
     }
 
     const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
+    const existingStudent = await findStudentByRollNo(normalizedRollNo);
 
-    const rollQuery = buildRollQuery(normalizedRollNo);
+    if (existingStudent) {
+      existingStudent.name = name || existingStudent.name;
+      existingStudent.semester = semester || existingStudent.semester || 1;
+      existingStudent.section = section || classDoc.section;
+      existingStudent.classId = classDoc._id;
+      if (photoUrl) {
+        existingStudent.photoUrl = photoUrl;
+      }
+      await existingStudent.save();
+
+      return res.status(200).json({
+        message: 'Student assigned to class',
+        reused: true,
+        student: {
+          id: existingStudent._id,
+          name: existingStudent.name,
+          rollNo: existingStudent.rollNo,
+          classId: existingStudent.classId,
+        },
+        generatedPassword: null,
+      });
+    }
 
     const plainPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(plainPassword, 10);
-    const update = {
-      $set: {
-        name,
-        semester: semester || 1,
-        section: section || classDoc.section,
-        classId: classDoc._id,
-        ...(photoUrl ? { photoUrl } : {}),
-      },
-      $setOnInsert: {
-        rollNo: normalizedRollNo,
-        passwordHash,
-      },
-    };
 
-    const result = await Student.findOneAndUpdate(
-      { $or: rollQuery },
-      update,
-      { new: true, upsert: true, setDefaultsOnInsert: true, rawResult: true }
-    );
+    const student = await Student.create({
+      name,
+      rollNo: normalizedRollNo,
+      semester: semester || 1,
+      section: section || classDoc.section,
+      classId: classDoc._id,
+      ...(photoUrl ? { photoUrl } : {}),
+      passwordHash,
+    });
 
-    const student = result.value || result;
-    const wasCreated = result.lastErrorObject && !result.lastErrorObject.updatedExisting;
-
-    res.status(wasCreated ? 201 : 200).json({
-      message: wasCreated ? 'Student added' : 'Student assigned to class',
-      reused: !wasCreated,
+    res.status(201).json({
+      message: 'Student added',
+      reused: false,
       student: {
         id: student._id,
         name: student.name,
         rollNo: student.rollNo,
         classId: student.classId,
       },
-      generatedPassword: wasCreated ? plainPassword : null,
+      generatedPassword: plainPassword,
     });
   } catch (err) {
     if (err.message && err.message.includes('Only .jpg/.jpeg files')) {
@@ -225,8 +243,7 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
         const normalizedRollNo = rollNo ? String(rollNo).trim() : '';
         if (normalizedRollNo) {
           const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
-          const rollQuery = buildRollQuery(normalizedRollNo);
-          const existing = await Student.findOne({ $or: rollQuery });
+          const existing = await findStudentByRollNo(normalizedRollNo);
           if (existing && classDoc) {
             existing.name = name || existing.name;
             existing.semester = semester || existing.semester || 1;
