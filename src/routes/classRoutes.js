@@ -159,7 +159,13 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
 
     const photoUrl = req.file ? `/uploads/students/${req.file.filename}` : null;
 
-    const existing = await Student.findOne({ rollNo: normalizedRollNo });
+    const rollQuery = [{ rollNo: normalizedRollNo }];
+    const rollAsNumber = Number(normalizedRollNo);
+    if (!Number.isNaN(rollAsNumber)) {
+      rollQuery.push({ rollNo: rollAsNumber });
+    }
+
+    const existing = await Student.findOne({ $or: rollQuery });
     if (existing) {
       existing.name = name;
       existing.semester = semester || existing.semester || 1;
@@ -219,7 +225,12 @@ router.post('/:id/students', authMiddleware, upload.single('photo'), async (req,
         const normalizedRollNo = rollNo ? String(rollNo).trim() : '';
         if (normalizedRollNo) {
           const classDoc = await Class.findOne({ _id: req.params.id, facultyId: req.user.id });
-          const existing = await Student.findOne({ rollNo: normalizedRollNo });
+          const rollQuery = [{ rollNo: normalizedRollNo }];
+          const rollAsNumber = Number(normalizedRollNo);
+          if (!Number.isNaN(rollAsNumber)) {
+            rollQuery.push({ rollNo: rollAsNumber });
+          }
+          const existing = await Student.findOne({ $or: rollQuery });
           if (existing && classDoc) {
             existing.name = name || existing.name;
             existing.semester = semester || existing.semester || 1;
